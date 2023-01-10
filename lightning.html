@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>lightning solver</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        font-size: 11pt;
+      }
+
+      input[type="number"] {
+        width: 4em;
+        text-align: right;
+      }
+
+      table {
+        border-collapse: collapse;
+        margin: 1em;
+      }
+
+      td {
+        /*width: 20px;*/
+        width: 30px;
+        height: 20px;
+        border-color: #000;
+        border-style: solid;
+        border-width: 0;
+        text-align: center;
+        overflow: hidden;
+      }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  </head>
+  <body>
+    Creates a maze then finds the shortest path from the top-center cell to the
+    bottom row.
+    <button onclick="go()">Restart</button>
+    <label
+      ><input type="checkbox" id="autorestart" checked /> Auto Restart
+      (3s)</label
+    ><br />
+    <div style="display: inline-block; margin-right: 2em">
+      <b>Complexity:</b><br />
+      <label><input type="radio" name="complexity" value="0.9" />Simple</label
+      ><br />
+      <label><input type="radio" name="complexity" value="0.8" />Average</label
+      ><br />
+      <label
+        ><input
+          type="radio"
+          name="complexity"
+          value="0.75"
+          checked
+        />Complex</label
+      >
+    </div>
+    <div style="display: inline-block; vertical-align: top">
+      <b>Size:</b><br />
+      Height: <input type="number" id="height" value="32" min="10" /><br />
+      Width: <input type="number" id="width" value="32" min="10" />
+    </div>
+    <table></table>
+    <script>
+      var tableWidth, tableHeight;
+      function timeout(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      $(document).ready(() => go());
+
+      let go = async () => {
+        let complexity = parseFloat(
+          $("[name=complexity]:checked").attr("value")
+        );
+        tableHeight = parseInt($("#height").val());
+        tableWidth = parseInt($("#width").val());
+        $("button").attr("disabled", "disabled");
+        $("table").empty();
+
+        // creates a table with random borders on the cells
+        for (let y = 0; y < tableHeight; y++) {
+          var row = $("<tr />");
+          for (let x = 0; x < tableWidth; x++) {
+            var cell = $("<td />");
+            if (y == 0) cell[0].style.borderTopWidth = "1px";
+            if (y == tableHeight - 1) cell[0].style.borderBottomWidth = "1px";
+            if (x == 0) cell[0].style.borderLeftWidth = "1px";
+            if (x == tableWidth - 1) cell[0].style.borderRightWidth = "1px";
+            if (Math.random() > complexity)
+              cell[0].style.borderRightWidth = "1px";
+            if (Math.random() > complexity)
+              cell[0].style.borderBottomWidth = "1px";
+            if (Math.random() > complexity)
+              cell[0].style.borderLeftWidth = "1px";
+            if (Math.random() > complexity)
+              cell[0].style.borderTopWidth = "1px";
+            cell.appendTo(row);
+          }
+          row.appendTo("table");
+          await timeout(50);
+        }
+
+        var found, bottom;
+        var iter = 0;
+        getCell(Math.floor(tableWidth / 2), 0).text("0");
+        do {
+          found = false;
+          bottom = false;
+          $("td")
+            .filter((index, el) => el.textContent == iter.toString())
+            .each((index, el) => {
+              let $this = $(el);
+              found = true;
+              let x = $this.index();
+              let y = $this.parent().index();
+              if (
+                getCell(x - 1, y).text() == "" &&
+                $this[0].style.borderLeftWidth == 0 &&
+                $this.prev()[0].style.borderRightWidth == 0
+              )
+                getCell(x - 1, y)
+                  .text(iter + 1)
+                  .css(
+                    "background-color",
+                    "hsl(" + (iter + 1) * 5 + " 100% 95%)"
+                  );
+              if (
+                getCell(x + 1, y).text() == "" &&
+                $this[0].style.borderRightWidth == 0 &&
+                $this.next()[0].style.borderLeftWidth == 0
+              )
+                getCell(x + 1, y)
+                  .text(iter + 1)
+                  .css(
+                    "background-color",
+                    "hsl(" + (iter + 1) * 5 + " 100% 95%)"
+                  );
+
+              if (
+                getCell(x, y - 1).text() == "" &&
+                $this[0].style.borderTopWidth == 0 &&
+                getCell(x, y - 1)[0].style.borderBottomWidth == 0
+              )
+                getCell(x, y - 1)
+                  .text(iter + 1)
+                  .css(
+                    "background-color",
+                    "hsl(" + (iter + 1) * 5 + " 100% 95%)"
+                  );
+              if (
+                getCell(x, y + 1).text() == "" &&
+                $this[0].style.borderBottomWidth == 0 &&
+                getCell(x, y + 1)[0].style.borderTopWidth == 0
+              ) {
+                getCell(x, y + 1)
+                  .text(iter + 1)
+                  .css(
+                    "background-color",
+                    "hsl(" + (iter + 1) * 5 + " 100% 95%)"
+                  );
+                if (y + 1 == tableHeight - 1) bottom = true;
+              }
+            });
+          iter++;
+          await timeout(50);
+        } while (found && !bottom);
+
+        // check if solution was found
+        if (
+          $("table tr:last-child td")
+            .toArray()
+            .filter((x) => $(x).text() !== "").length == 0
+        ) {
+          $("tr:nth-child(" + Math.floor(tableHeight / 2) + ")")
+            .css({ background: "red", color: "white", fontWeight: "bold" })
+            .html("<td colspan='100%'>No Path Found</td>");
+          await timeout(3000);
+          go();
+          return;
+        }
+
+        $("tr:last-child")
+          .children()
+          .filter((index, el) => {
+            return $(el).text() == iter.toString();
+          })
+          .css("background", "yellow");
+
+        for (; iter > -1; iter--) {
+          $("td")
+            .filter((index, el) => {
+              return $(el).text() == iter.toString();
+            })
+            .each((index, el) => {
+              let x = $(el).index();
+              let y = $(el).parent().index();
+
+              if (
+                getCell(x - 1, y)[0].style.backgroundColor == "yellow" &&
+                getCell(x - 1, y)[0].style.borderRightWidth == 0 &&
+                el.style.borderLeftWidth == 0
+              )
+                $(el).css("background", "yellow");
+              if (
+                getCell(x + 1, y)[0].style.backgroundColor == "yellow" &&
+                getCell(x + 1, y)[0].style.borderLeftWidth == 0 &&
+                el.style.borderRightWidth == 0
+              )
+                $(el).css("background", "yellow");
+
+              if (
+                getCell(x, y - 1)[0].style.backgroundColor == "yellow" &&
+                getCell(x, y - 1)[0].style.borderBottomWidth == 0 &&
+                el.style.borderTopWidth == 0
+              )
+                $(el).css("background", "yellow");
+              if (
+                getCell(x, y + 1)[0].style.backgroundColor == "yellow" &&
+                getCell(x, y + 1)[0].style.borderTopWidth == 0 &&
+                el.style.borderBottomWidth == 0
+              )
+                $(el).css("background", "yellow");
+            });
+          await timeout(50);
+        }
+
+        abortRestart: if ($("#autorestart").is(":checked")) {
+          await timeout(3000);
+          if (!$("#autorestart").is(":checked")) break abortRestart;
+          go();
+          return;
+        }
+
+        $("button").removeAttr("disabled");
+      };
+
+      let getCell = (x, y) => {
+        if (x < 0 || y < 0 || x > tableWidth - 1 || y > tableHeight - 1)
+          return $("<div />");
+        return $("table").find("tr").eq(y).children().eq(x);
+      };
+    </script>
+  </body>
+</html>
